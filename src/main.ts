@@ -5,6 +5,9 @@ import * as morgan from 'morgan';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  const morgan = require('morgan');
+
+
   app.use(morgan('dev'))
 
   // Configuración global de validaciones
@@ -16,9 +19,9 @@ async function bootstrap() {
     }),
   );
 
-   const port = process.env.PORT || 3000;
-   await app.listen(port);
-  console.log(`Log-Transformer corriendo en http://localhost:${port}`);
+   const PORT = process.env.PORT || 3000;
+   await app.listen(PORT);
+  console.log(`Log-Transformer corriendo en http://localhost:${PORT}`);
 }
 
 bootstrap();

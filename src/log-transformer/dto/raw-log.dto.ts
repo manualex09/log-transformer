@@ -1,4 +1,11 @@
-import { IsString, IsDateString, IsIn } from 'class-validator';
+import { IsString, IsDateString, IsEnum } from 'class-validator';
+
+export enum Loglevel {
+
+INFO = 'INFO',
+WARN = 'WARN',
+ERROR = 'ERROR',
+}
 
 export class RawLogDto {
   @IsDateString()
@@ -7,8 +14,8 @@ export class RawLogDto {
   @IsString()
   cameraId: string;
 
-  @IsIn(['INFO', 'WARN', 'ERROR'])
-  level: string;
+  @IsEnum(Loglevel)
+  level: Loglevel;
 
   @IsString()
   message: string;
