@@ -1,74 +1,108 @@
-import { Controller, Post, Body, Get,  } from '@nestjs/common';
-import { LogTransformerService } from './log-transformer.service';
-import { RawLogDto } from './dto/raw-log.dto';
+import { 
+  Controller, 
+  Post, 
+  Body, 
+  Get,
+  Logger,
+  Query,
+  HttpCode,
+  HttpStatus
+} from '@nestjs/common';
+import { LogTransformerService } from './log-transformer.service.refactored';
+import { 
+  TransformLogDto, 
+  ProcessLogsByCameraDto, 
+  ProcessLogsByRangeDto 
+} from './dto/transform-log.dto';
 
 @Controller('transform')
 export class LogTransformerController {
+  private readonly logger = new Logger(LogTransformerController.name);
+
   constructor(
-    private readonly logTransformerService: LogTransformerService,
+    private readonly transformerService: LogTransformerService
   ) {}
 
-  // ==========================================
-  // ✅ TU ENDPOINT ORIGINAL - SE MANTIENE
-  // ==========================================
-
   /**
-   * POST /transform
-   * Endpoint original: Recibe un log y lo transforma inmediatamente
+   * POST /transform/transform
+   * Transformar un log individual recibido directamente
    */
-  @Post()
-  transform(@Body() log: RawLogDto) {
-    return this.logTransformerService.transformLog(log);
+  @Post('transform')
+  @HttpCode(HttpStatus.OK)
+  transformSingleLog(@Body() dto: TransformLogDto) {
+    this.logger.log('POST /transform/transform');
+    
+    const transformed = this.transformerService.transformSingleLog(dto);
+    
+    return {
+      success: true,
+      log: transformed,
+    };
   }
-
-  // ==========================================
-  // 🆕 NUEVOS ENDPOINTS - Solicitar logs del log-service
-  // ==========================================
 
   /**
    * POST /transform/process
-   * Procesa logs pendientes del log-service manualmente
-   * Ejemplo: POST http://localhost:5000/transform/process
-   * Opcional: POST http://localhost:5000/transform/process?cameraID=server1
+   * Procesar logs de una cámara específica (llama al extractor)
    */
   @Post('process')
- async processLogs(@Body() body?: { cameraID?: string }) {
-    return await this.logTransformerService.processLogs(body?.cameraID);
+  @HttpCode(HttpStatus.OK)
+  async processLogs(@Body() dto: ProcessLogsByCameraDto) {
+    this.logger.log(`POST /transform/process - Camera: ${dto.cameraId}`);
+    
+    const transformed = await this.transformerService.processCameraLogs(dto.cameraId);
+    const stats = this.transformerService.getStatistics(transformed);
+    
+    return {
+      success: true,
+      cameraId: dto.cameraId,
+      statistics: stats,
+      logs: transformed,
+    };
   }
 
   /**
    * POST /transform/process-range
-   * Procesa logs por rango de fechas
-   * Body: {
-   *   "startDate": "2024-01-01",
-   *   "endDate": "2024-01-31",
-   *   "serverName": "server1" (opcional)
-   * }
+   * Procesar logs en un rango de fechas (llama al extractor)
    */
   @Post('process-range')
-  async processLogsByDateRange(
-    @Body() body: { startDate: string; endDate: string; cameraID?: string }
-  ) {
-    return await this.logTransformerService.processLogsByDateRange(body);
+  @HttpCode(HttpStatus.OK)
+  async processRange(@Body() dto: ProcessLogsByRangeDto) {
+    this.logger.log(`POST /transform/process-range - ${dto.start} to ${dto.end}`);
+    
+    const transformed = await this.transformerService.processLogsByRange(
+      dto.start,
+      dto.end,
+      dto.cameraId
+    );
+    
+    const stats = this.transformerService.getStatistics(transformed);
+    
+    return {
+      success: true,
+      range: {
+        start: dto.start,
+        end: dto.end,
+        cameraId: dto.cameraId || 'all'
+      },
+      statistics: stats,
+      logs: transformed,
+    };
   }
 
   /**
    * GET /transform/status
-   * Ver estado del transformer
+   * Estado del servicio de transformación
    */
   @Get('status')
   getStatus() {
+    this.logger.log('GET /transform/status');
+    
     return {
-      status: 'running',
       service: 'log-transformer',
+      status: 'running',
       version: '1.0.0',
-      message: 'Transformer está activo. Procesa logs automáticamente cada 5 minutos.',
-      endpoints: {
-        transform: 'POST /transform - Transforma un log individual',
-        process: 'POST /transform/process - Procesa logs pendientes del log-service',
-        processRange: 'POST /transform/process-range - Procesa logs por fecha',
-        status: 'GET /transform/status - Ver estado del servicio',
-      },
+      timestamp: new Date().toISOString(),
+      extractorUrl: process.env.EXTRACTOR_URL || 'http://localhost:4000',
     };
   }
 }
